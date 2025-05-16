@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Forest Fairy Gemstone Game</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="fairy-icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #game {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: url('background.png') repeat;
+        background-size: contain;
+      }
+      .fairy {
+        position: absolute;
+        width: 96px;
+        height: 96px;
+        background: url('sprite.png') center/contain no-repeat;
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .gem {
+        position: absolute;
+        width: 64px;
+        height: 64px;
+        background: url('gemstone.png') center/contain no-repeat;
+        pointer-events: none;
+      }
+      #scoreBox {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 24px;
+        background: rgba(255, 255, 255, 0.75);
+        padding: 4px 12px;
+        border-radius: 12px;
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
+      }
+      #resetBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 16px;
+        background: #d9534f;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 6px 10px;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game">
+      <div id="scoreBox">Gems: <span id="score">0</span></div>
+      <button id="resetBtn" title="Start over">Reset</button>
+      <audio id="plop" src="plop.mp3" preload="auto"></audio>
+      <audio id="bling" src="bling.mp3" preload="auto"></audio>
+    </div>
+
+    <script>
+      /* =============================================================
+       Forest Fairy Gemstone Game – idle‑wander cycle + lifespan
+         • Fairy cycle: 5 s idle bounce → 5 s wander → 5 s idle →
+           10 s wander → repeat (5/10 sec wander lengths).
+         • Starts in idle (standing).
+         • Lifespan 10 min with bling.mp3 on vanish, but one always stays.
+    ============================================================= */
+
+      const game = document.getElementById('game');
+      const scoreSpan = document.getElementById('score');
+      const resetBtn = document.getElementById('resetBtn');
+      const plop = document.getElementById('plop');
+      plop.volume = 0.5;
+      const bling = document.getElementById('bling');
+      bling.volume = 0.5;
+
+      const rand = (m) => Math.random() * m;
+      const rect = (e) => {
+        const r = e.getBoundingClientRect();
+        return { x: r.left, y: r.top, w: r.width, h: r.height };
+      };
+      const hit = (a, b) =>
+        a.x < b.x + b.w &&
+        a.x + a.w > b.x &&
+        a.y < b.y + b.h &&
+        a.y + a.h > b.y;
+      const SAVE_KEY = 'ffgg_state';
+
+      class Fairy {
+        constructor(x, y) {
+          this.el = document.createElement('div');
+          this.el.className = 'fairy';
+          game.appendChild(this.el);
+          this.x = x;
+          this.y = y;
+          this.updatePos();
+          this.pid = null;
+          this.dx = 0;
+          this.dy = 0;
+          this.isWandering = false;
+          this.nextWander = 5000;
+          this.enableDrag();
+          this.startIdlePhase();
+          this.walkTimer = setInterval(() => this.step(), 300);
+          this.lifeTimer = setTimeout(() => this.expire(), 600000); // 10 min
+        }
+        updatePos() {
+          this.el.style.left = this.x + 'px';
+          this.el.style.top = this.y + 'px';
+        }
+
+        /* -------- movement core -------- */
+        setRandomDir() {
+          const speed = 20 + rand(30),
+            ang = rand(Math.PI * 2);
+          this.dx = Math.cos(ang) * speed;
+          this.dy = Math.sin(ang) * speed;
+        }
+        step() {
+          if (this.pid || !this.isWandering) return; // only move when wandering and not dragged
+          let nx = this.x + this.dx,
+            ny = this.y + this.dy;
+          const maxX = game.clientWidth - 96,
+            maxY = game.clientHeight - 96;
+          if (nx < 0 || nx > maxX || ny < 0 || ny > maxY) {
+            this.setRandomDir();
+            nx = this.x + this.dx;
+            ny = this.y + this.dy;
+          }
+          this.moveCenter(nx + 48, ny + 48, false);
+          if (rand(1) < 0.1) this.setRandomDir();
+        }
+        moveCenter(cx, cy, prop) {
+          const w = 96,
+            h = 96,
+            maxX = game.clientWidth - w,
+            maxY = game.clientHeight - h;
+          const nx = Math.max(0, Math.min(cx - w / 2, maxX)),
+            ny = Math.max(0, Math.min(cy - h / 2, maxY));
+          const dx = nx - this.x,
+            dy = ny - this.y;
+          if (!dx && !dy) return;
+          this.x = nx;
+          this.y = ny;
+          this.updatePos();
+          checkGems();
+          if (prop)
+            fairies.forEach((f) => {
+              if (f !== this && hit(rect(this.el), rect(f.el))) f.nudge(dx, dy);
+            });
+        }
+        nudge(dx, dy) {
+          this.moveCenter(this.x + dx + 48, this.y + dy + 48, false);
+        }
+
+        /* -------- idle / wander cycle -------- */
+        startIdlePhase() {
+          this.isWandering = false;
+          this.startBounce();
+          this.idleTimer = setTimeout(() => this.startWanderPhase(), 5000);
+        }
+        startBounce() {
+          const loop = () => {
+            if (!this.pid && !this.isWandering) {
+              const a = 6 + rand(12),
+                d = 250 + rand(250);
+              this.el.animate(
+                [
+                  { transform: 'translateY(0)' },
+                  { transform: `translateY(-${a}px)` },
+                ],
+                {
+                  duration: d,
+                  direction: 'alternate',
+                  iterations: 2,
+                  easing: 'ease-out',
+                }
+              );
+            }
+            this.bounceTimer = setTimeout(loop, 1500 + rand(3000));
+          };
+          this.bounceTimer = setTimeout(loop, rand(2000));
+        }
+        startWanderPhase() {
+          this.isWandering = true;
+          this.setRandomDir();
+          clearTimeout(this.bounceTimer);
+          const duration = this.nextWander;
+          this.nextWander = this.nextWander === 5000 ? 10000 : 5000;
+          this.wanderTimer = setTimeout(() => {
+            this.isWandering = false;
+            this.startIdlePhase();
+          }, duration);
+        }
+
+        /* -------- drag handlers -------- */
+        enableDrag() {
+          this.el.addEventListener('pointerdown', (e) => {
+            this.pid = e.pointerId;
+            this.moveCenter(e.clientX, e.clientY, true);
+            e.stopPropagation();
+          });
+          window.addEventListener('pointermove', (e) => {
+            if (e.pointerId === this.pid)
+              this.moveCenter(e.clientX, e.clientY, true);
+          });
+          ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) =>
+            window.addEventListener(t, (e) => {
+              if (e.pointerId === this.pid) {
+                this.pid = null;
+              }
+            })
+          );
+        }
+
+        /* -------- lifespan -------- */
+        expire() {
+          if (fairies.length <= 1) {
+            this.lifeTimer = setTimeout(() => this.expire(), 600000);
+            return;
+          }
+          bling.currentTime = 0;
+          bling.play().catch(() => {});
+          this.destroy();
+          const i = fairies.indexOf(this);
+          if (i !== -1) fairies.splice(i, 1);
+        }
+        destroy() {
+          clearInterval(this.walkTimer);
+          clearTimeout(this.idleTimer);
+          clearTimeout(this.wanderTimer);
+          clearTimeout(this.bounceTimer);
+          clearTimeout(this.lifeTimer);
+          this.el.remove();
+        }
+      }
+
+      /* ---------- gems ---------- */
+      function spawnGem() {
+        const g = document.createElement('div');
+        g.className = 'gem';
+        g.style.left = rand(game.clientWidth - 64) + 'px';
+        g.style.top = rand(game.clientHeight - 64) + 'px';
+        game.appendChild(g);
+      }
+      function checkGems() {
+        document.querySelectorAll('.gem').forEach((g) => {
+          if (fairies.some((f) => hit(rect(f.el), rect(g)))) collect(g);
+        });
+      }
+      function collect(g) {
+        g.remove();
+        score++;
+        scoreSpan.textContent = score;
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ score }));
+        plop.currentTime = 0;
+        plop.play().catch(() => {});
+        if (score % 100 === 0) addFairy();
+      }
+
+      /* ---------- setup ---------- */
+      let score = 0;
+      const fairies = [];
+      function addFairy() {
+        fairies.push(
+          new Fairy(
+            game.clientWidth / 2 - 48 + rand(40) - 20,
+            game.clientHeight * 0.7 - 48 + rand(40) - 20
+          )
+        );
+      }
+      (function init() {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+        if (saved && saved.score) score = saved.score;
+        scoreSpan.textContent = score;
+        addFairy();
+        for (let i = 1; i < Math.floor(score / 100) + 1; i++) addFairy();
+        spawnGem();
+        setInterval(spawnGem, 1800);
+      })();
+
+      resetBtn.addEventListener('click', () => {
+        document.querySelectorAll('.gem').forEach((g) => g.remove());
+        fairies.forEach((f) => f.destroy());
+        fairies.length = 0;
+        score = 0;
+        scoreSpan.textContent = '0';
+        localStorage.removeItem(SAVE_KEY);
+        addFairy();
+      });
+      window.addEventListener('resize', () => {
+        fairies.forEach((f) => f.moveCenter(f.x + 48, f.y + 48, false));
+      });
+    </script>
+  </body>
+</html>
