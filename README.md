@@ -7,7 +7,8 @@ Written in plain HTML / CSS / vanilla ES‑modules—host it on GitHub Pages
 
 ## 📸 Gameplay Preview
 
-*(drop a GIF or screenshot here when you have one!)*
+<!-- 400-pixel-wide thumbnail -->
+<img src="assets/game-screen.png" alt="Gameplay screenshot" width="400">
 
 ---
 
