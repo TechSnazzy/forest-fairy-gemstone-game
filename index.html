@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Forest Fairy Gemstone Game</title>
+  <style>
+    /* ----- Layout & backgrounds ----- */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;          /* prevent the page from scrolling on iPhone */
+      touch-action: none;        /* enable smooth pointer‑move tracking */
+      -webkit-user-select: none; /* disable accidental text selection */
+      user-select: none;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    #game {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: url("background.png") repeat;
+      background-size: contain;  /* scales nicely on any screen size */
+    }
+
+    /* ----- Fairy (player) ----- */
+    #fairy {
+      position: absolute;
+      width: 96px;
+      height: 96px;
+      background: url("sprite.png") center / contain no-repeat;
+      left: calc(50% - 48px);
+      top:  calc(70% - 48px);
+      pointer-events: none;  /* so the fairy never blocks pointer events */
+    }
+
+    /* ----- Gemstones ----- */
+    .gem {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      background: url("gemstone.png") center / contain no-repeat;
+    }
+
+    /* ----- Score badge ----- */
+    #scoreBox {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      background: rgba(255, 255, 255, 0.75);
+      padding: 4px 12px;
+      border-radius: 12px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.25);
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="scoreBox">Gems: <span id="score">0</span></div>
+    <div id="fairy"></div>
+  </div>
+
+  <script>
+    /* =============================================================
+       Forest Fairy Gemstone Game – core logic      
+       -------------------------------------------------------------
+       1. Drag the fairy with a finger (or mouse).
+       2. Gems spawn at random positions every ~2 s.
+       3. When the fairy touches a gem, it vanishes and the score
+          increments.  The game runs indefinitely.
+    ============================================================= */
+
+    const game   = document.getElementById("game");
+    const fairy  = document.getElementById("fairy");
+    const scoreSpan = document.getElementById("score");
+
+    let score = 0;
+    let activePointer = null;    // tracks the current drag‑pointer id
+
+    /* ---------- Helpers ---------- */
+    function spawnGem() {
+      const gem = document.createElement("div");
+      gem.className = "gem";
+
+      const gW = 64, gH = 64;                     // gem size (matches CSS)
+      const maxX = game.clientWidth  - gW;
+      const maxY = game.clientHeight - gH;
+
+      gem.style.left = Math.random() * maxX + "px";
+      gem.style.top  = Math.random() * maxY + "px";
+
+      game.appendChild(gem);
+    }
+
+    function rect(el) {
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top, w: r.width, h: r.height };
+    }
+
+    function isColliding(a, b) {
+      return (
+        a.x < b.x + b.w &&
+        a.x + a.w > b.x &&
+        a.y < b.y + b.h &&
+        a.y + a.h > b.y
+      );
+    }
+
+    function checkCollisions() {
+      const gems = [...document.querySelectorAll(".gem")];
+      const fRect = rect(fairy);
+
+      gems.forEach(g => {
+        if (isColliding(fRect, rect(g))) {
+          g.remove();
+          score++;
+          scoreSpan.textContent = score;
+        }
+      });
+    }
+
+    function setFairyPos(x, y) {
+      const fW = fairy.clientWidth,  fH = fairy.clientHeight;
+      const maxX = game.clientWidth  - fW;
+      const maxY = game.clientHeight - fH;
+
+      // Center fairy on the touch point and keep inside bounds
+      const nx = Math.max(0, Math.min(x - fW / 2, maxX));
+      const ny = Math.max(0, Math.min(y - fH / 2, maxY));
+
+      fairy.style.left = nx + "px";
+      fairy.style.top  = ny + "px";
+
+      checkCollisions();
+    }
+
+    /* ---------- Pointer events for drag control ---------- */
+    game.addEventListener("pointerdown", e => {
+      activePointer = e.pointerId;
+      setFairyPos(e.clientX, e.clientY);
+    });
+
+    game.addEventListener("pointermove", e => {
+      if (e.pointerId === activePointer) {
+        setFairyPos(e.clientX, e.clientY);
+      }
+    });
+
+    ["pointerup", "pointercancel", "pointerleave"].forEach(type => {
+      game.addEventListener(type, e => {
+        if (e.pointerId === activePointer) {
+          activePointer = null;
+        }
+      });
+    });
+
+    /* ---------- Start the gem spawner ---------- */
+    spawnGem();                                     // drop the first one immediately
+    setInterval(spawnGem, 1800);                    // then every 1.8 s
+  </script>
+</body>
+</html>

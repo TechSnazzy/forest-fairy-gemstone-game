@@ -1,0 +1,42 @@
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Node.js
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+
+# IDEs and Editors
+.vscode/
+.idea/
+
+# Environment files
+.env
+
+# Compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.out
+*.class
+
+# Archives
+*.zip
+*.tar
+*.gz
+*.7z
+*.rar
