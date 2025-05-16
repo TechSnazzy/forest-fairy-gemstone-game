@@ -72,3 +72,13 @@ body {
 #lifeSlider {
   width: 110px;
 }
+
+/* halfway warning (orange tint) */
+.fairy.warning {
+  filter: sepia(1) hue-rotate(30deg) saturate(3);
+}
+
+/* low-life danger (red tint) */
+.fairy.danger {
+  filter: sepia(1) hue-rotate(0deg) saturate(5) brightness(1.2);
+}
