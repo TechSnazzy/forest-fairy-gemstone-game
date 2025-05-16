@@ -1,166 +1,314 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Forest Fairy Gemstone Game</title>
-  <style>
-    /* ----- Layout & backgrounds ----- */
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;          /* prevent the page from scrolling on iPhone */
-      touch-action: none;        /* enable smooth pointer‑move tracking */
-      -webkit-user-select: none; /* disable accidental text selection */
-      user-select: none;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Forest Fairy Gemstone Game</title>
 
-    #game {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      background: url("background.png") repeat;
-      background-size: contain;  /* scales nicely on any screen size */
-    }
+    <!-- iOS home‑screen icon (180 × 180 PNG of the fairy) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="fairy-icon-180.png" />
+    <!-- Optional PWA manifest for Android / desktop -->
+    <link rel="manifest" href="manifest.json" />
 
-    /* ----- Fairy (player) ----- */
-    #fairy {
-      position: absolute;
-      width: 96px;
-      height: 96px;
-      background: url("sprite.png") center / contain no-repeat;
-      left: calc(50% - 48px);
-      top:  calc(70% - 48px);
-      pointer-events: none;  /* so the fairy never blocks pointer events */
-    }
+    <style>
+      /* ============ Layout ============ */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #game {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: url('background.png') repeat;
+        background-size: contain;
+      }
 
-    /* ----- Gemstones ----- */
-    .gem {
-      position: absolute;
-      width: 64px;
-      height: 64px;
-      background: url("gemstone.png") center / contain no-repeat;
-    }
+      /* ============ Sprites ============ */
+      .fairy {
+        position: absolute;
+        width: 96px;
+        height: 96px;
+        background: url('sprite.png') center/contain no-repeat;
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .gem {
+        position: absolute;
+        width: 64px;
+        height: 64px;
+        background: url('gemstone.png') center/contain no-repeat;
+        pointer-events: none;
+      }
 
-    /* ----- Score badge ----- */
-    #scoreBox {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 24px;
-      background: rgba(255, 255, 255, 0.75);
-      padding: 4px 12px;
-      border-radius: 12px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.25);
-    }
-  </style>
-</head>
-<body>
-  <div id="game">
-    <div id="scoreBox">Gems: <span id="score">0</span></div>
-    <div id="fairy"></div>
-  </div>
+      /* ============ UI ============ */
+      #scoreBox {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 24px;
+        background: rgba(255, 255, 255, 0.75);
+        padding: 4px 12px;
+        border-radius: 12px;
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
+      }
+      #resetBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 16px;
+        background: #d9534f;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 6px 10px;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+      }
+      #soundBtn {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-size: 20px;
+        background: #5bc0de;
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game">
+      <div id="scoreBox">Gems: <span id="score">0</span></div>
+      <button id="soundBtn" title="Toggle music">🔊</button>
+      <button id="resetBtn" title="Start over">Reset</button>
 
-  <script>
-    /* =============================================================
-       Forest Fairy Gemstone Game – core logic      
-       -------------------------------------------------------------
-       1. Drag the fairy with a finger (or mouse).
-       2. Gems spawn at random positions every ~2 s.
-       3. When the fairy touches a gem, it vanishes and the score
-          increments.  The game runs indefinitely.
-    ============================================================= */
+      <!-- Audio sources -->
+      <audio id="bgm" src="forest-fairy-110537.mp3" loop></audio>
+      <audio id="sfx" src="plop.mp3" preload="auto"></audio>
+      <!-- gem‑collect sound -->
+    </div>
 
-    const game   = document.getElementById("game");
-    const fairy  = document.getElementById("fairy");
-    const scoreSpan = document.getElementById("score");
+    <script>
+      /* =============================================================
+     Forest Fairy Gemstone Game – v10  (uses plop.mp3 for SFX)
+  ============================================================= */
 
-    let score = 0;
-    let activePointer = null;    // tracks the current drag‑pointer id
+      /* ---------- DOM refs ---------- */
+      const game = document.getElementById('game');
+      const scoreSpan = document.getElementById('score');
+      const resetBtn = document.getElementById('resetBtn');
+      const soundBtn = document.getElementById('soundBtn');
+      const bgm = document.getElementById('bgm');
+      const sfx = document.getElementById('sfx');
+      sfx.volume = 0.5; // 50 % volume
 
-    /* ---------- Helpers ---------- */
-    function spawnGem() {
-      const gem = document.createElement("div");
-      gem.className = "gem";
-
-      const gW = 64, gH = 64;                     // gem size (matches CSS)
-      const maxX = game.clientWidth  - gW;
-      const maxY = game.clientHeight - gH;
-
-      gem.style.left = Math.random() * maxX + "px";
-      gem.style.top  = Math.random() * maxY + "px";
-
-      game.appendChild(gem);
-    }
-
-    function rect(el) {
-      const r = el.getBoundingClientRect();
-      return { x: r.left, y: r.top, w: r.width, h: r.height };
-    }
-
-    function isColliding(a, b) {
-      return (
+      /* ---------- Helpers ---------- */
+      const rand = (m) => Math.random() * m;
+      const rect = (e) => {
+        const r = e.getBoundingClientRect();
+        return { x: r.left, y: r.top, w: r.width, h: r.height };
+      };
+      const hits = (a, b) =>
         a.x < b.x + b.w &&
         a.x + a.w > b.x &&
         a.y < b.y + b.h &&
-        a.y + a.h > b.y
+        a.y + a.h > b.y;
+
+      /* ---------- Persistence keys ---------- */
+      const SAVE_KEY = 'ffgg_state';
+      const SOUND_KEY = 'ffgg_sound';
+
+      /* ---------- Music / mute ---------- */
+      bgm.volume = 0.4;
+      bgm.muted = localStorage.getItem(SOUND_KEY) === 'muted';
+      sfx.muted = bgm.muted;
+      updateSoundBtn();
+      bgm.play().catch(() => {});
+      game.addEventListener(
+        'pointerdown',
+        () => {
+          if (!bgm.muted) bgm.play().catch(() => {});
+        },
+        { once: true }
       );
-    }
-
-    function checkCollisions() {
-      const gems = [...document.querySelectorAll(".gem")];
-      const fRect = rect(fairy);
-
-      gems.forEach(g => {
-        if (isColliding(fRect, rect(g))) {
-          g.remove();
-          score++;
-          scoreSpan.textContent = score;
-        }
+      soundBtn.addEventListener('click', () => {
+        bgm.muted = !bgm.muted;
+        sfx.muted = bgm.muted;
+        localStorage.setItem(SOUND_KEY, bgm.muted ? 'muted' : 'unmuted');
+        updateSoundBtn();
+        if (!bgm.muted) bgm.play().catch(() => {});
       });
-    }
-
-    function setFairyPos(x, y) {
-      const fW = fairy.clientWidth,  fH = fairy.clientHeight;
-      const maxX = game.clientWidth  - fW;
-      const maxY = game.clientHeight - fH;
-
-      // Center fairy on the touch point and keep inside bounds
-      const nx = Math.max(0, Math.min(x - fW / 2, maxX));
-      const ny = Math.max(0, Math.min(y - fH / 2, maxY));
-
-      fairy.style.left = nx + "px";
-      fairy.style.top  = ny + "px";
-
-      checkCollisions();
-    }
-
-    /* ---------- Pointer events for drag control ---------- */
-    game.addEventListener("pointerdown", e => {
-      activePointer = e.pointerId;
-      setFairyPos(e.clientX, e.clientY);
-    });
-
-    game.addEventListener("pointermove", e => {
-      if (e.pointerId === activePointer) {
-        setFairyPos(e.clientX, e.clientY);
+      function updateSoundBtn() {
+        soundBtn.textContent = bgm.muted ? '🔇' : '🔊';
       }
-    });
 
-    ["pointerup", "pointercancel", "pointerleave"].forEach(type => {
-      game.addEventListener(type, e => {
-        if (e.pointerId === activePointer) {
-          activePointer = null;
+      /* ---------- Game state ---------- */
+      let score = 0;
+      const fairies = [];
+
+      class Fairy {
+        constructor(x, y) {
+          this.el = document.createElement('div');
+          this.el.className = 'fairy';
+          this.el.style.left = x + 'px';
+          this.el.style.top = y + 'px';
+          game.appendChild(this.el);
+          this.prevX = x;
+          this.prevY = y;
+          this.pointerId = null;
+          this.enableDrag();
+          this.startIdle();
         }
-      });
-    });
+        enableDrag() {
+          this.el.addEventListener('pointerdown', (e) => {
+            this.pointerId = e.pointerId;
+            this.move(e.clientX, e.clientY, true);
+            e.stopPropagation();
+          });
+          window.addEventListener('pointermove', (e) => {
+            if (e.pointerId === this.pointerId)
+              this.move(e.clientX, e.clientY, true);
+          });
+          ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) =>
+            window.addEventListener(t, (e) => {
+              if (e.pointerId === this.pointerId) this.pointerId = null;
+            })
+          );
+        }
+        move(cx, cy, prop) {
+          const fW = this.el.offsetWidth,
+            fH = this.el.offsetHeight,
+            maxX = game.clientWidth - fW,
+            maxY = game.clientHeight - fH;
+          const nx = Math.max(0, Math.min(cx - fW / 2, maxX)),
+            ny = Math.max(0, Math.min(cy - fH / 2, maxY));
+          const dx = nx - this.prevX,
+            dy = ny - this.prevY;
+          if (!dx && !dy) return;
+          this.prevX = nx;
+          this.prevY = ny;
+          this.el.style.left = nx + 'px';
+          this.el.style.top = ny + 'px';
+          checkGems();
+          if (prop)
+            fairies.forEach((f) => {
+              if (f !== this && hits(rect(this.el), rect(f.el)))
+                f.nudge(dx, dy);
+            });
+        }
+        nudge(dx, dy) {
+          const r = rect(this.el);
+          this.move(r.x + r.w / 2 + dx, r.y + r.h / 2 + dy, false);
+        }
+        startIdle() {
+          const loop = () => {
+            if (!this.pointerId) {
+              const amp = 6 + rand(12),
+                dur = 250 + rand(250);
+              this.el.animate(
+                [
+                  { transform: 'translateY(0)' },
+                  { transform: `translateY(-${amp}px)` },
+                ],
+                {
+                  duration: dur,
+                  direction: 'alternate',
+                  iterations: 2,
+                  easing: 'ease-out',
+                }
+              );
+            }
+            this.timer = setTimeout(loop, 1500 + rand(3000));
+          };
+          this.timer = setTimeout(loop, rand(2000));
+        }
+        destroy() {
+          clearTimeout(this.timer);
+          this.el.remove();
+        }
+      }
 
-    /* ---------- Start the gem spawner ---------- */
-    spawnGem();                                     // drop the first one immediately
-    setInterval(spawnGem, 1800);                    // then every 1.8 s
-  </script>
-</body>
+      /* ---------- Gems ---------- */
+      function spawnGem() {
+        const g = document.createElement('div');
+        g.className = 'gem';
+        g.style.left = rand(game.clientWidth - 64) + 'px';
+        g.style.top = rand(game.clientHeight - 64) + 'px';
+        game.appendChild(g);
+      }
+      function checkGems() {
+        document.querySelectorAll('.gem').forEach((g) => {
+          if (fairies.some((f) => hits(rect(f.el), rect(g)))) collect(g);
+        });
+      }
+      function collect(g) {
+        g.remove();
+        score++;
+        scoreSpan.textContent = score;
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ score }));
+        if (!bgm.muted) {
+          sfx.currentTime = 0;
+          sfx.play().catch(() => {});
+        }
+        if (score % 100 === 0) addFairy();
+      }
+
+      /* ---------- Spawners ---------- */
+      function addFairy() {
+        fairies.push(
+          new Fairy(
+            game.clientWidth / 2 - 48 + rand(40) - 20,
+            game.clientHeight * 0.7 - 48 + rand(40) - 20
+          )
+        );
+      }
+
+      /* ---------- Init ---------- */
+      (function () {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+        if (saved && saved.score) score = saved.score;
+        scoreSpan.textContent = score;
+        addFairy();
+        for (let i = 1; i < Math.floor(score / 100) + 1; i++) addFairy();
+        spawnGem();
+        setInterval(spawnGem, 1800);
+      })();
+
+      /* ---------- Reset ---------- */
+      resetBtn.addEventListener('click', () => {
+        document.querySelectorAll('.gem').forEach((g) => g.remove());
+        fairies.forEach((f) => f.destroy());
+        fairies.length = 0;
+        score = 0;
+        scoreSpan.textContent = '0';
+        localStorage.removeItem(SAVE_KEY);
+        addFairy();
+      });
+
+      /* ---------- Resize guard ---------- */
+      window.addEventListener('resize', () => {
+        fairies.forEach((f) => {
+          const r = rect(f.el);
+          f.move(r.x + r.w / 2, r.y + r.h / 2, false);
+        });
+      });
+    </script>
+  </body>
 </html>
