@@ -1,261 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
-    />
-    <title>Forest Fairy Gemstone Game</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Forest Fairy Gemstone Game</title>
 
-    <!-- iOS home‑screen icon for Add‑to‑Home‑Screen -->
-    <link rel="apple-touch-icon" sizes="180x180" href="fairy-icon-180.png" />
-    <!-- Full‑screen web‑app mode on iOS -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+  <!-- iOS home‑screen icon -->
+  <link rel="apple-touch-icon" sizes="180x180" href="fairy-icon-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
 
-    <style>
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        overflow: hidden;
-        touch-action: none;
-        -webkit-user-select: none;
-        user-select: none;
-        font-family: system-ui, -apple-system, sans-serif;
-      }
-      #game {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        background: url('background.png') repeat;
-        background-size: contain;
-      }
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:system-ui,-apple-system,sans-serif;}
+    #game{position:relative;width:100%;height:100%;background:url("background.png") repeat;background-size:contain;}
+    .fairy{position:absolute;width:96px;height:96px;background:url("sprite.png") center/contain no-repeat;pointer-events:auto;touch-action:none;}
+    .gem  {position:absolute;width:64px;height:64px;background:url("gemstone.png") center/contain no-repeat;pointer-events:none;}
 
-      .fairy {
-        position: absolute;
-        width: 96px;
-        height: 96px;
-        background: url('sprite.png') center/contain no-repeat;
-        pointer-events: auto;
-        touch-action: none;
-      }
-      .gem {
-        position: absolute;
-        width: 64px;
-        height: 64px;
-        background: url('gemstone.png') center/contain no-repeat;
-        pointer-events: none;
-      }
+    /* UI widgets */
+    #scoreBox{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:24px;background:rgba(255,255,255,.75);padding:4px 12px;border-radius:12px;box-shadow:0 0 6px rgba(0,0,0,.25);}    
+    #resetBtn{position:absolute;top:10px;right:10px;font-size:16px;background:#d9534f;color:#fff;border:none;border-radius:8px;padding:6px 10px;box-shadow:0 0 4px rgba(0,0,0,.25);}    
+    #lifeCtrl{position:absolute;top:10px;left:10px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.75);padding:4px 8px;border-radius:8px;box-shadow:0 0 4px rgba(0,0,0,.25);font-size:14px;user-select:none;}
+    #lifeSlider{width:110px;}
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="scoreBox">Gems: <span id="score">0</span></div>
+    <div id="lifeCtrl">Life&nbsp;<input type="range" id="lifeSlider" min="1" max="60" value="10"><span id="lifeVal">10</span>m</div>
+    <button id="resetBtn" title="Start over">Reset</button>
 
-      #scoreBox {
-        position: absolute;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 24px;
-        background: rgba(255, 255, 255, 0.75);
-        padding: 4px 12px;
-        border-radius: 12px;
-        box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
-      }
-      #resetBtn {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        font-size: 16px;
-        background: #d9534f;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 6px 10px;
-        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
-      }
-    </style>
-  </head>
-  <body>
-    <div id="game">
-      <div id="scoreBox">Gems: <span id="score">0</span></div>
-      <button id="resetBtn" title="Start over">Reset</button>
+    <!-- sounds -->
+    <audio id="plop"  src="plop.mp3"  preload="auto"></audio>
+    <audio id="bling" src="bling.mp3" preload="auto"></audio>
+  </div>
 
-      <!-- Gem‑collect sound only -->
-      <audio id="sfx" src="plop.mp3" preload="auto"></audio>
-    </div>
-
-    <script>
-      /* =============================================================
-     Forest Fairy Gemstone Game – v12
-       • Background music and mute button removed.
-       • Only gem‑pickup SFX remains (plop.mp3 @ 50% vol).
-       • Manifest tag removed to eliminate 404 on home‑screen app.
+  <script>
+  /* =============================================================
+     Forest Fairy Gemstone Game – v17
+       • Slider (1‑60 min) adjusts fairy lifespan live.
+       • 5s idle ↔ 5/10s wander cycle.
+       • Corner‑bounce movement, at least one fairy alive.
   ============================================================= */
 
-      const game = document.getElementById('game');
-      const scoreSpan = document.getElementById('score');
-      const resetBtn = document.getElementById('resetBtn');
-      const sfx = document.getElementById('sfx');
-      sfx.volume = 0.5;
+  /* DOM refs */
+  const game=document.getElementById('game');
+  const scoreSpan=document.getElementById('score');
+  const resetBtn=document.getElementById('resetBtn');
+  const lifeSlider=document.getElementById('lifeSlider');
+  const lifeVal=document.getElementById('lifeVal');
+  const plop=document.getElementById('plop'); plop.volume=0.5;
+  const bling=document.getElementById('bling'); bling.volume=0.5;
 
-      const rand = (m) => Math.random() * m;
-      const rect = (e) => {
-        const r = e.getBoundingClientRect();
-        return { x: r.left, y: r.top, w: r.width, h: r.height };
-      };
-      const coll = (a, b) =>
-        a.x < b.x + b.w &&
-        a.x + a.w > b.x &&
-        a.y < b.y + b.h &&
-        a.y + a.h > b.y;
+  /* config */
+  let lifeMinutes=parseInt(lifeSlider.value,10);
 
-      const SAVE_KEY = 'ffgg_state';
+  /* helpers */
+  const rand=m=>Math.random()*m;
+  const rect=el=>{const r=el.getBoundingClientRect();return{x:r.left,y:r.top,w:r.width,h:r.height};};
+  const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+  const SAVE_KEY='ffgg_state';
 
-      /* ---------- Game objects ---------- */
-      let score = 0;
-      const fairies = [];
+  /* Fairy class */
+  class Fairy{
+    constructor(x,y){
+      this.el=document.createElement('div'); this.el.className='fairy'; game.appendChild(this.el);
+      this.x=x; this.y=y; this.updatePos();
+      this.pid=null;
+      this.dx=0; this.dy=0;
+      this.isWandering=false; this.nextWander=5000;
+      this.enableDrag();
+      this.startIdle();
+      this.walkTimer=setInterval(()=>this.step(),300);
+      this.resetLife();
+    }
+    updatePos(){this.el.style.left=this.x+'px';this.el.style.top=this.y+'px';}
 
-      class Fairy {
-        constructor(x, y) {
-          this.el = document.createElement('div');
-          this.el.className = 'fairy';
-          this.el.style.left = x + 'px';
-          this.el.style.top = y + 'px';
-          game.appendChild(this.el);
-          this.px = x;
-          this.py = y;
-          this.pid = null;
-          this.drag();
-          this.idle();
-        }
-        drag() {
-          this.el.addEventListener('pointerdown', (e) => {
-            this.pid = e.pointerId;
-            this.move(e.clientX, e.clientY, true);
-            e.stopPropagation();
-          });
-          window.addEventListener('pointermove', (e) => {
-            if (e.pointerId === this.pid) this.move(e.clientX, e.clientY, true);
-          });
-          ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) =>
-            window.addEventListener(t, (e) => {
-              if (e.pointerId === this.pid) this.pid = null;
-            })
-          );
-        }
-        move(cx, cy, prop) {
-          const w = this.el.offsetWidth,
-            h = this.el.offsetHeight,
-            maxX = game.clientWidth - w,
-            maxY = game.clientHeight - h;
-          const nx = Math.max(0, Math.min(cx - w / 2, maxX)),
-            ny = Math.max(0, Math.min(cy - h / 2, maxY));
-          const dx = nx - this.px,
-            dy = ny - this.py;
-          if (!dx && !dy) return;
-          this.px = nx;
-          this.py = ny;
-          this.el.style.left = nx + 'px';
-          this.el.style.top = ny + 'px';
-          checkGems();
-          if (prop)
-            fairies.forEach((f) => {
-              if (f !== this && coll(rect(this.el), rect(f.el)))
-                f.nudge(dx, dy);
-            });
-        }
-        nudge(dx, dy) {
-          const r = rect(this.el);
-          this.move(r.x + r.w / 2 + dx, r.y + r.h / 2 + dy, false);
-        }
-        idle() {
-          const loop = () => {
-            if (!this.pid) {
-              const a = 6 + rand(12),
-                d = 250 + rand(250);
-              this.el.animate(
-                [
-                  { transform: 'translateY(0)' },
-                  { transform: `translateY(-${a}px)` },
-                ],
-                {
-                  duration: d,
-                  direction: 'alternate',
-                  iterations: 2,
-                  easing: 'ease-out',
-                }
-              );
-            }
-            this.t = setTimeout(loop, 1500 + rand(3000));
-          };
-          this.t = setTimeout(loop, rand(2000));
-        }
-        destroy() {
-          clearTimeout(this.t);
-          this.el.remove();
-        }
-      }
+    /* life */
+    resetLife(){ clearTimeout(this.lifeTimer); this.lifeTimer=setTimeout(()=>this.expire(),lifeMinutes*60000); }
+    expire(){ if(fairies.length<=1){ this.resetLife(); return; } bling.currentTime=0; bling.play().catch(()=>{}); this.destroy(); fairies.splice(fairies.indexOf(this),1); }
 
-      /* ---------- Gems ---------- */
-      function spawnGem() {
-        const g = document.createElement('div');
-        g.className = 'gem';
-        g.style.left = rand(game.clientWidth - 64) + 'px';
-        g.style.top = rand(game.clientHeight - 64) + 'px';
-        game.appendChild(g);
-      }
-      function checkGems() {
-        document.querySelectorAll('.gem').forEach((g) => {
-          if (fairies.some((f) => coll(rect(f.el), rect(g)))) collect(g);
-        });
-      }
-      function collect(g) {
-        g.remove();
-        score++;
-        scoreSpan.textContent = score;
-        localStorage.setItem(SAVE_KEY, JSON.stringify({ score }));
-        sfx.currentTime = 0;
-        sfx.play().catch(() => {});
-        if (score % 100 === 0) addFairy();
-      }
+    /* movement */
+    setRandDir(){const speed=20+rand(30),ang=rand(Math.PI*2);this.dx=Math.cos(ang)*speed;this.dy=Math.sin(ang)*speed;}
+    step(){ if(this.pid||!this.isWandering) return; let nx=this.x+this.dx, ny=this.y+this.dy; const maxX=game.clientWidth-96, maxY=game.clientHeight-96; if(nx<0||nx>maxX||ny<0||ny>maxY){ this.setRandDir(); nx=this.x+this.dx; ny=this.y+this.dy; } this.moveCenter(nx+48,ny+48,false); if(rand(1)<0.1) this.setRandDir(); }
+    moveCenter(cx,cy,prop){const w=96,h=96,maxX=game.clientWidth-w,maxY=game.clientHeight-h; const nx=Math.max(0,Math.min(cx-w/2,maxX)),ny=Math.max(0,Math.min(cy-h/2,maxY)); const dx=nx-this.x,dy=ny-this.y; if(!dx&&!dy) return; this.x=nx; this.y=ny; this.updatePos(); checkGems(); if(prop) fairies.forEach(f=>{ if(f!==this&&hit(rect(this.el),rect(f.el))) f.nudge(dx,dy); }); }
+    nudge(dx,dy){ this.moveCenter(this.x+dx+48,this.y+dy+48,false); }
 
-      /* ---------- Spawner ---------- */
-      function addFairy() {
-        fairies.push(
-          new Fairy(
-            game.clientWidth / 2 - 48 + rand(40) - 20,
-            game.clientHeight * 0.7 - 48 + rand(40) - 20
-          )
-        );
-      }
+    /* idle / wander cycle */
+    startIdle(){ this.isWandering=false; this.startBounce(); this.idleTimer=setTimeout(()=>this.startWander(),5000); }
+    startBounce(){ const loop=()=>{ if(!this.pid&&!this.isWandering){ const a=6+rand(12),d=250+rand(250); this.el.animate([{transform:'translateY(0)'},{transform:`translateY(-${a}px)`}],{duration:d,direction:'alternate',iterations:2,easing:'ease-out'});} this.bounceTimer=setTimeout(loop,1500+rand(3000)); }; this.bounceTimer=setTimeout(loop,rand(2000)); }
+    startWander(){ this.isWandering=true; this.setRandDir(); clearTimeout(this.bounceTimer); const dur=this.nextWander; this.nextWander=this.nextWander===5000?10000:5000; this.wanderTimer=setTimeout(()=>{ this.isWandering=false; this.startIdle(); }, dur); }
 
-      /* ---------- Init ---------- */
-      (function () {
-        const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-        if (saved && saved.score) score = saved.score;
-        scoreSpan.textContent = score;
-        addFairy();
-        for (let i = 1; i < Math.floor(score / 100) + 1; i++) addFairy();
-        spawnGem();
-        setInterval(spawnGem, 1800);
-      })();
+    /* drag */
+    enableDrag(){ this.el.addEventListener('pointerdown',e=>{ this.pid=e.pointerId; this.moveCenter(e.clientX,e.clientY,true); e.stopPropagation(); }); window.addEventListener('pointermove',e=>{ if(e.pointerId===this.pid) this.moveCenter(e.clientX,e.clientY,true); }); ['pointerup','pointercancel','pointerleave'].forEach(t=>window.addEventListener(t,e=>{ if(e.pointerId===this.pid){ this.pid=null; } })); }
 
-      /* ---------- Reset ---------- */
-      resetBtn.addEventListener('click', () => {
-        document.querySelectorAll('.gem').forEach((g) => g.remove());
-        fairies.forEach((f) => f.destroy());
-        fairies.length = 0;
-        score = 0;
-        scoreSpan.textContent = '0';
-        localStorage.removeItem(SAVE_KEY);
-        addFairy();
-      });
+    /* cleanup */
+    destroy(){ clearInterval(this.walkTimer); clearTimeout(this.idleTimer); clearTimeout(this.wanderTimer); clearTimeout(this.bounceTimer); clearTimeout(this.lifeTimer); this.el.remove(); }
+  }
 
-      /* ---------- Resize guard ---------- */
-      window.addEventListener('resize', () => {
-        fairies.forEach((f) => {
-          const r = rect(f.el);
-          f.move(r.x + r.w / 2, r.y + r.h / 2, false);
-        });
-      });
-    </script>
-  </body>
+  /* gems & scoring */
+  function spawnGem(){ const g=document.createElement('div'); g.className='gem'; g.style.left=rand(game.clientWidth-64)+'px'; g.style.top=rand(game.clientHeight-64)+'px'; game.appendChild(g); }
+  function checkGems(){ document.querySelectorAll('.gem').forEach(g=>{ if(fairies.some(f=>hit(rect(f.el),rect(g)))) collect(g); }); }
+  function collect(g){ g.remove(); score++; scoreSpan.textContent=score; localStorage.setItem(SAVE_KEY,JSON.stringify({score})); plop.currentTime=0; plop.play().catch(()=>{}); if(score%100===0) addFairy(); }
+
+  /* setup */
+  let score=0; const fairies=[];
+  function addFairy(){ fairies.push(new Fairy(game.clientWidth/2-48+rand(40)-20, game.clientHeight*0.7-48+rand(40)-20)); }
+
+  (function init(){ const saved=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(saved&&saved.score) score=saved.score; scoreSpan.textContent=score; addFairy(); for(let i=1;i<Math.floor(score/100)+1;i++) addFairy(); spawnGem(); setInterval(spawnGem,1800); }());
+
+  /* UI events */
+  lifeSlider.addEventListener('input',()=>{ lifeMinutes=parseInt(lifeSlider.value,10); lifeVal.textContent=lifeMinutes; fairies.forEach(f=>f.resetLife()); });
+  resetBtn.addEventListener('click',()=>{ document.querySelectorAll('.gem').forEach(g=>g.remove()); fairies.forEach(f=>f.destroy()); fairies.length=0; score=0; scoreSpan.textContent='0'; localStorage.removeItem(SAVE_KEY); addFairy(); });
+  window.addEventListener('resize',()=>{ fairies.forEach(f=>f.moveCenter(f.x+48,f.y+48,false)); });
+  </script>
+</body>
 </html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Forest Fairy Gemstone Game</title>
+
+    <!-- iOS home‑screen icon for Add‑to‑Home‑Screen -->
+    <link rel="apple-touch-icon" sizes="180x180" href="fairy-icon-180.png" />
+    <!-- Full‑screen web‑app mode on iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #game {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: url('background.png') repeat;
+        background-size: contain;
+      }
+
+      .fairy {
+        position: absolute;
+        width: 96px;
+        height: 96px;
+        background: url('sprite.png') center/contain no-repeat;
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .gem {
+        position: absolute;
+        width: 64px;
+        height: 64px;
+        background: url('gemstone.png') center/contain no-repeat;
+        pointer-events: none;
+      }
+
+      #scoreBox {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 24px;
+        background: rgba(255, 255, 255, 0.75);
+        padding: 4px 12px;
+        border-radius: 12px;
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
+      }
+      #resetBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 16px;
+        background: #d9534f;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 6px 10px;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game">
+      <div id="scoreBox">Gems: <span id="score">0</span></div>
+      <button id="resetBtn" title="Start over">Reset</button>
+
+      <!-- Gem‑collect sound only -->
+      <audio id="sfx" src="plop.mp3" preload="auto"></audio>
+    </div>
+
+    <script>
+      /* =============================================================
+     Forest Fairy Gemstone Game – v12
+       • Background music and mute button removed.
+       • Only gem‑pickup SFX remains (plop.mp3 @ 50% vol).
+       • Manifest tag removed to eliminate 404 on home‑screen app.
+  ============================================================= */
+
+      const game = document.getElementById('game');
+      const scoreSpan = document.getElementById('score');
+      const resetBtn = document.getElementById('resetBtn');
+      const sfx = document.getElementById('sfx');
+      sfx.volume = 0.5;
+
+      const rand = (m) => Math.random() * m;
+      const rect = (e) => {
+        const r = e.getBoundingClientRect();
+        return { x: r.left, y: r.top, w: r.width, h: r.height };
+      };
+      const coll = (a, b) =>
+        a.x < b.x + b.w &&
+        a.x + a.w > b.x &&
+        a.y < b.y + b.h &&
+        a.y + a.h > b.y;
+
+      const SAVE_KEY = 'ffgg_state';
+
+      /* ---------- Game objects ---------- */
+      let score = 0;
+      const fairies = [];
+
+      class Fairy {
+        constructor(x, y) {
+          this.el = document.createElement('div');
+          this.el.className = 'fairy';
+          this.el.style.left = x + 'px';
+          this.el.style.top = y + 'px';
+          game.appendChild(this.el);
+          this.px = x;
+          this.py = y;
+          this.pid = null;
+          this.drag();
+          this.idle();
+        }
+        drag() {
+          this.el.addEventListener('pointerdown', (e) => {
+            this.pid = e.pointerId;
+            this.move(e.clientX, e.clientY, true);
+            e.stopPropagation();
+          });
+          window.addEventListener('pointermove', (e) => {
+            if (e.pointerId === this.pid) this.move(e.clientX, e.clientY, true);
+          });
+          ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) =>
+            window.addEventListener(t, (e) => {
+              if (e.pointerId === this.pid) this.pid = null;
+            })
+          );
+        }
+        move(cx, cy, prop) {
+          const w = this.el.offsetWidth,
+            h = this.el.offsetHeight,
+            maxX = game.clientWidth - w,
+            maxY = game.clientHeight - h;
+          const nx = Math.max(0, Math.min(cx - w / 2, maxX)),
+            ny = Math.max(0, Math.min(cy - h / 2, maxY));
+          const dx = nx - this.px,
+            dy = ny - this.py;
+          if (!dx && !dy) return;
+          this.px = nx;
+          this.py = ny;
+          this.el.style.left = nx + 'px';
+          this.el.style.top = ny + 'px';
+          checkGems();
+          if (prop)
+            fairies.forEach((f) => {
+              if (f !== this && coll(rect(this.el), rect(f.el)))
+                f.nudge(dx, dy);
+            });
+        }
+        nudge(dx, dy) {
+          const r = rect(this.el);
+          this.move(r.x + r.w / 2 + dx, r.y + r.h / 2 + dy, false);
+        }
+        idle() {
+          const loop = () => {
+            if (!this.pid) {
+              const a = 6 + rand(12),
+                d = 250 + rand(250);
+              this.el.animate(
+                [
+                  { transform: 'translateY(0)' },
+                  { transform: `translateY(-${a}px)` },
+                ],
+                {
+                  duration: d,
+                  direction: 'alternate',
+                  iterations: 2,
+                  easing: 'ease-out',
+                }
+              );
+            }
+            this.t = setTimeout(loop, 1500 + rand(3000));
+          };
+          this.t = setTimeout(loop, rand(2000));
+        }
+        destroy() {
+          clearTimeout(this.t);
+          this.el.remove();
+        }
+      }
+
+      /* ---------- Gems ---------- */
+      function spawnGem() {
+        const g = document.createElement('div');
+        g.className = 'gem';
+        g.style.left = rand(game.clientWidth - 64) + 'px';
+        g.style.top = rand(game.clientHeight - 64) + 'px';
+        game.appendChild(g);
+      }
+      function checkGems() {
+        document.querySelectorAll('.gem').forEach((g) => {
+          if (fairies.some((f) => coll(rect(f.el), rect(g)))) collect(g);
+        });
+      }
+      function collect(g) {
+        g.remove();
+        score++;
+        scoreSpan.textContent = score;
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ score }));
+        sfx.currentTime = 0;
+        sfx.play().catch(() => {});
+        if (score % 100 === 0) addFairy();
+      }
+
+      /* ---------- Spawner ---------- */
+      function addFairy() {
+        fairies.push(
+          new Fairy(
+            game.clientWidth / 2 - 48 + rand(40) - 20,
+            game.clientHeight * 0.7 - 48 + rand(40) - 20
+          )
+        );
+      }
+
+      /* ---------- Init ---------- */
+      (function () {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+        if (saved && saved.score) score = saved.score;
+        scoreSpan.textContent = score;
+        addFairy();
+        for (let i = 1; i < Math.floor(score / 100) + 1; i++) addFairy();
+        spawnGem();
+        setInterval(spawnGem, 1800);
+      })();
+
+      /* ---------- Reset ---------- */
+      resetBtn.addEventListener('click', () => {
+        document.querySelectorAll('.gem').forEach((g) => g.remove());
+        fairies.forEach((f) => f.destroy());
+        fairies.length = 0;
+        score = 0;
+        scoreSpan.textContent = '0';
+        localStorage.removeItem(SAVE_KEY);
+        addFairy();
+      });
+
+      /* ---------- Resize guard ---------- */
+      window.addEventListener('resize', () => {
+        fairies.forEach((f) => {
+          const r = rect(f.el);
+          f.move(r.x + r.w / 2, r.y + r.h / 2, false);
+        });
+      });
+    </script>
+  </body>
+</html>
