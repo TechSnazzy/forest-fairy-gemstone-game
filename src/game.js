@@ -54,10 +54,6 @@ class Fairy {
   }
 
   /* life */
-  // resetLife() {
-  //   clearTimeout(this.lifeTimer);
-  //   this.lifeTimer = setTimeout(() => this.expire(), lifeMinutes * 60000);
-  // }
   resetLife() {
     // stop any existing timers
     clearTimeout(this.lifeTimer);
@@ -67,27 +63,28 @@ class Fairy {
     this.totalLife = lifeMinutes * 60000;
     this.remainingLife = this.totalLife;
 
-    // how long before expiry we switch to red (in ms)
-    const dangerThreshold = 2 * 60_000; // 2 minutes
+    // how long before expiry we switch to red
+    const dangerThreshold = 2 * 60_000; // 2 min
 
-    // clear any tint
-    this.el.classList.remove('warning', 'danger');
+    // clear any previous filter
+    this.el.style.filter = '';
 
-    // schedule removal
+    // schedule actual removal
     this.lifeTimer = setTimeout(() => this.expire(), this.totalLife);
 
-    // every second, update remainingLife and apply tints
+    // every second, update remainingLife and apply inline tints
     this.lifeInterval = setInterval(() => {
       this.remainingLife -= 1000;
       const halfLife = this.totalLife / 2;
 
       if (this.remainingLife <= dangerThreshold) {
-        // last 2 min → red
-        this.el.classList.remove('warning');
-        this.el.classList.add('danger');
+        // last 2 min → red
+        this.el.style.filter =
+          'sepia(1) hue-rotate(-15deg) saturate(8) brightness(1.2)';
       } else if (this.remainingLife <= halfLife) {
         // past halfway → orange
-        this.el.classList.add('warning');
+        this.el.style.filter =
+          'sepia(1) hue-rotate(30deg) saturate(8) brightness(1)';
       }
     }, 1000);
   }
