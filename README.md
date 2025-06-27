@@ -32,3 +32,5 @@
 6. **Reset**: Click the “Reset” button to start a new game anytime.
 
 Enjoy guiding your forest fairies through a magical gemstone quest!
+
+2025
