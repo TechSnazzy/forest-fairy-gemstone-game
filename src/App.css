@@ -1,0 +1,28 @@
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.app-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Outfit', system-ui, sans-serif;
+  user-select: none;
+  touch-action: none;
+}
+
+.app-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url('/background.png') no-repeat center center fixed;
+  background-size: cover;
+  filter: saturate(0.6) brightness(0.8);
+  /* Desaturate and slightly darken */
+  z-index: -1;
+}

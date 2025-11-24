@@ -1,40 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
-    />
-    <title>Forest Fairy Gemstone Game</title>
-
-    <!-- iOS home‑screen icon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="fairy-icon-180.png" />
-
-    <!-- single stylesheet -->
-    <link rel="stylesheet" href="src/game.css" />
-
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>forest-fairy-gemstone-game</title>
   </head>
   <body>
-    <div id="game">
-      <div id="scoreBox">Gems: <span id="score">0</span></div>
-      <div id="lifeCtrl">
-        Life&nbsp;<input
-          type="range"
-          id="lifeSlider"
-          min="1"
-          max="60"
-          value="10"
-        /><span id="lifeVal">10</span>m
-      </div>
-      <button id="resetBtn" title="Start over">Reset</button>
-
-      <!-- sounds -->
-      <audio id="plop" src="assets/sounds/plop.mp3" preload="auto"></audio>
-      <audio id="bling" src="assets/sounds/plop.mp3" preload="auto"></audio>
-    </div>
-
-    <script src="src/game.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
